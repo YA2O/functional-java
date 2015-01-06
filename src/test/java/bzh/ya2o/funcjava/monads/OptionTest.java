@@ -2,8 +2,8 @@ package bzh.ya2o.funcjava.monads;
 
 import bzh.ya2o.funcjava.functions.Function0;
 import bzh.ya2o.funcjava.functions.Function1;
+import bzh.ya2o.funcjava.functions.Predicate;
 
-import com.google.common.base.Predicate;
 import org.junit.Test;
 
 import java.util.NoSuchElementException;
@@ -58,7 +58,7 @@ public class OptionTest {
     @Test
     public void flatMap_None() {
         final Option<String> option = none();
-        final Option<Integer> integerOption = option.flatMap(new Function1<String, Option<Integer>>() {
+        final Option<Integer> integerOption = option.<Integer>flatMap(new Function1<String, Option<Integer>>() {
             @Override
             public Option<Integer> apply(final String s) {
                 return option(s.length());
@@ -108,7 +108,7 @@ public class OptionTest {
         final Option<String> option = none();
         final Option<String> filtered = option.filter(new Predicate<String>() {
             @Override
-            public boolean apply(final String s) {
+            public Boolean apply(final String s) {
                 return true;
             }
         });
@@ -120,7 +120,7 @@ public class OptionTest {
         final Option<String> option = option("A");
         final Option<String> filtered = option.filter(new Predicate<String>() {
             @Override
-            public boolean apply(final String s) {
+            public Boolean apply(final String s) {
                 return s.equals("A");
             }
         });
@@ -132,7 +132,7 @@ public class OptionTest {
         final Option<String> option = option("A");
         final Option<String> filtered = option.filter(new Predicate<String>() {
             @Override
-            public boolean apply(final String s) {
+            public Boolean apply(final String s) {
                 return s.equals("B");
             }
         });
@@ -190,7 +190,7 @@ public class OptionTest {
     }
 
     @Test
-    public void equals_Some_notSameType() {
+    public void equals_Some_covariant() {
         assertEquals(Option.<Integer>option(1), Option.<Number>option(1));
         assertEquals(Option.<Number>option(1), Option.<Integer>option(1));
     }

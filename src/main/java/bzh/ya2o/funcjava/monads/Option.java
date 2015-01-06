@@ -2,50 +2,121 @@ package bzh.ya2o.funcjava.monads;
 
 import bzh.ya2o.funcjava.functions.Function0;
 import bzh.ya2o.funcjava.functions.Function1;
+import bzh.ya2o.funcjava.functions.Predicate;
 
-import com.google.common.base.Predicate;
-
+import java.io.Serializable;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
-@SuppressWarnings({"MethodNamesDifferingOnlyByCase", "ProhibitedExceptionThrown"})
-public abstract class Option<T> {
+public abstract class Option<T extends Serializable> implements Serializable {
 
     private Option() {}
 
-    public static final <T> Option<T> option(final T t) {
-        return (t == null) ? None.<T>none() : Some.some(t);
+    public static <A extends Serializable> Option<A> some(final A a) {
+        return new Some<>(a);
+    }
+
+    public static <A extends Serializable> Option<A> none() {
+        return new None<>();
+    }
+
+
+    public static final <T extends Serializable> Option<T> option(final T t) {
+        return (t == null) ? Option.<T>none() : Option.some(t);
     }
 
     public abstract Boolean isDefined();
 
     public abstract T get();
 
-    public abstract <U> Option<U> flatMap(Function1<T, Option<U>> f);
+    public abstract <U extends Serializable> Option<U> flatMap(Function1<? super T, ? extends Option<U>> f);
 
-    public <U> Option<U> map(final Function1<T, U> f) {
+    public <U extends Serializable> Option<U> map(final Function1<? super T, ? extends U> f) {
         return flatMap(new Function1<T, Option<U>>() {
-            @SuppressWarnings("ParameterNameDiffersFromOverriddenParameter")
             @Override
             public Option<U> apply(final T t) {
-                return Some.some(f.apply(t));
+                return Option.option(f.apply(t));
             }
-
         });
     }
 
-    public abstract Option<T> filter(Predicate<T> p);
+    public abstract Option<T> filter(Predicate<? super T> p);
 
-    public abstract <U> U match(Function1<T, U> onPresent, Function0<U> onAbsent);
+    public abstract <U> U match(Function1<? super T, ? extends U> onPresent, Function0<? extends U> onAbsent);
 
 
-    @SuppressWarnings("MethodNamesDifferingOnlyByCase")
-    public static final class None<T> extends Option<T> {
-        private None() {}
+    public static final class Some<T extends Serializable> extends Option<T> {
+        private final T value;
 
-        public static <A> Option<A> none() {
-            return new None<>();
+        private Some(final T t) {
+            if (t == null) {
+                throw new NullPointerException("Option.Some can not contain a null value");
+            }
+            value = t;
         }
+
+        @Override
+        public Boolean isDefined() {
+            return true;
+        }
+
+        @Override
+        public T get() {
+            return value;
+        }
+
+        @Override
+        public <U extends Serializable> Option<U> flatMap(final Function1<? super T, ? extends Option<U>> f) {
+            return f.apply(value);
+        }
+
+        @Override
+        public Option<T> filter(final Predicate<? super T> p) {
+            return p.apply(value) ? this : Option.<T>none();
+        }
+
+        @Override
+        public <U> U match(final Function1<? super T, ? extends U> onPresent, final Function0<? extends U> onAbsent) {
+            return onPresent.apply(value);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(value);
+        }
+
+        /**
+         * NB: Option<T> is covariant
+         */
+        @Override
+        public boolean equals(final Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (value == null || Option.class != other.getClass()) {
+                return false;
+            }
+            return valueEquals(((Option) other).get());
+        }
+
+        private <U> Boolean valueEquals(U u) {
+            if (u == null) {
+                return false;
+            }
+            if (u.getClass().isAssignableFrom(value.getClass())) {
+                return u.equals((U) value);
+            }
+            if (value.getClass().isAssignableFrom(u.getClass())) {
+                return value.equals((T) u);
+            }
+            return false;
+        }
+    }
+
+
+
+    public static final class None<T extends Serializable> extends Option<T> {
+        private None() {}
 
         @Override
         public Boolean isDefined() {
@@ -54,21 +125,21 @@ public abstract class Option<T> {
 
         @Override
         public T get() {
-            throw new NoSuchElementException("Calling get() on Option=None");
+            throw new NoSuchElementException("Calling get() on an instance of Option.None!");
         }
 
         @Override
-        public <U> Option<U> flatMap(final Function1<T, Option<U>> f) {
-            return None.none();
+        public <U extends Serializable> Option<U> flatMap(final Function1<? super T, ? extends Option<U>> f) {
+            return Option.none();
         }
 
         @Override
-        public Option<T> filter(final Predicate<T> p) {
-            return None.none();
+        public Option<T> filter(final Predicate<? super T> p) {
+            return Option.none();
         }
 
         @Override
-        public <U> U match(final Function1<T, U> onPresent, final Function0<U> onAbsent) {
+        public <U> U match(final Function1<? super T, ? extends U> onPresent, final Function0<? extends U> onAbsent) {
             return onAbsent.apply();
         }
 
@@ -83,56 +154,6 @@ public abstract class Option<T> {
                 return true;
             }
             return other != null && getClass() == other.getClass();
-        }
-    }
-
-
-    public static final class Some<T> extends Option<T> {
-        private final T t;
-
-        private Some(final T t) {
-            this.t = t;
-        }
-
-        static <A> Option<A> some(final A a) {
-            return new Some<>(a);
-        }
-
-        @Override
-        public Boolean isDefined() {
-            return true;
-        }
-
-        @Override
-        public T get() {
-            return t;
-        }
-
-        @Override
-        public <U> Option<U> flatMap(final Function1<T, Option<U>> f) {
-            return f.apply(t);
-        }
-
-        @Override
-        public Option<T> filter(final Predicate<T> p) {
-            return p.apply(t) ? this : None.<T>none();
-        }
-
-        @Override
-        public <U> U match(final Function1<T, U> onPresent, final Function0<U> onAbsent) {
-            return onPresent.apply(t);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(t);
-        }
-
-        @Override
-        public boolean equals(final Object other) {
-            if (this == other) {return true;}
-            if (other == null || getClass() != other.getClass()) {return false;}
-            return Objects.equals(t, ((Some<T>) other).get());
         }
     }
 
